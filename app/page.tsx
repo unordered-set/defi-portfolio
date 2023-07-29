@@ -93,7 +93,7 @@ export default function Home() {
   const [wallets, setWallets] = useState<PrivateKeyAccount[]>([]);
 
   return (
-    <main className="flex min-h-screen flex-col p-24">
+    <main className="flex min-h-screen flex-col p-4">
       {wallets.length > 0 ? (<DefiPortfolio wallets={wallets} />) : (<WalletImporter setWallets={setWallets} />)}
     </main>
   )
