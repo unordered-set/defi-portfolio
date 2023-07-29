@@ -160,7 +160,7 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
         <h6 className="text-sm font-semibold">Last Txns</h6>
         {recentTransactions.length > 0 && (
           <div className="flex flex-col gap-1">
-            {recentTransactions.map(t => (<RecentTransaction tx={t} />))}
+            {recentTransactions.map(t => (<RecentTransaction key={t.hash} tx={t} />))}
           </div>)
         }
         <p className="text-xs text-neutral-400">
