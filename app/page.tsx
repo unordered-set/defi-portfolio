@@ -51,7 +51,10 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
           <div>
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger>{formatEther(walletInfo.zkSyncEthBalance)}</TooltipTrigger>
+                <TooltipTrigger>{((formattedEther: string) => {
+                  const dotPos = formattedEther.indexOf(".");
+                  return formattedEther.substring(0, dotPos + 4);
+                })(formatEther(walletInfo.zkSyncEthBalance))}</TooltipTrigger>
                 <TooltipContent>
                   <p>RAW: {walletInfo.zkSyncEthBalance.toString()}</p>
                 </TooltipContent>
