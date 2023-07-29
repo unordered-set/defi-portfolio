@@ -1,7 +1,7 @@
 "use client";
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -14,28 +14,61 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'
+import { parseAbi, createPublicClient, http, formatEther } from 'viem';
+import { zkSync, Chain } from 'viem/chains';
 
-function WalletOverview({ wallet }: { wallet: PrivateKeyAccount }) {
+interface WalletInfo {
+  address: string,
+  wallet: PrivateKeyAccount,
+
+  hasRetrievalErrors: boolean,
+  zkSyncEthBalance: bigint,
+}
+
+// Even though multicall3 provides a fn to get balance, viem stripped it off.
+const multicallABI = parseAbi([
+  'function getEthBalance(address addr) public view returns (uint256 balance)',
+])
+
+function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{`${wallet.address.substring(0, 6)}..${wallet.address.substring(wallet.address.length - 4)}`}</CardTitle>
-        <CardDescription>{wallet.address}</CardDescription>
+        <CardTitle>{`${walletInfo.address.substring(0, 6)}..${walletInfo.address.substring(walletInfo.address.length - 4)}`}</CardTitle>
+        <CardDescription>{walletInfo.address}</CardDescription>
       </CardHeader>
       <CardContent>
-        <p>Balances:</p>
+        <div className="grid gap-2 grid-cols-2">
+          <div>ZK Sync ERA ETH</div>
+          <div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>{formatEther(walletInfo.zkSyncEthBalance)}</TooltipTrigger>
+                <TooltipContent>
+                  <p>RAW: {walletInfo.zkSyncEthBalance.toString()}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
 }
 
-function ActionName({name}: {name: string}) {
+function ActionName({ name }: { name: string }) {
   return (<div className="text-lg font-semibold mt-8">{name}</div>)
 }
 
-function WalletAction({wallet}: {wallet: PrivateKeyAccount}) {
+function WalletAction({ wallet }: { wallet: PrivateKeyAccount }) {
   return (
     <div className="flex flex-col">
       <span>{wallet.address}</span>
@@ -44,7 +77,45 @@ function WalletAction({wallet}: {wallet: PrivateKeyAccount}) {
   )
 }
 
+async function getMulticall3Balances(wallets: PrivateKeyAccount[], chainInfo: Chain) {
+  if (!chainInfo?.contracts?.multicall3?.address) {
+    throw "Multicall is not defined in chaininfo";
+  }
+  const multicallContract = {
+    address: chainInfo.contracts.multicall3.address,
+    abi: multicallABI,
+  }
+  const publicClient = createPublicClient({
+    chain: chainInfo,
+    transport: http()
+  })
+  return await publicClient.multicall({
+    contracts: wallets.map(w => ({
+      ...multicallContract,
+      functionName: 'getEthBalance',
+      args: [w.address]
+    }))
+  })
+}
+
 function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
+  const [info, setInfo] = useState<WalletInfo[]>();
+
+  useEffect(() => {
+    const zkSyncBalances = getMulticall3Balances(wallets, zkSync);
+    Promise.all([zkSyncBalances]).then(results => {
+      const infos = (new Array(wallets.length).fill(0)).map((_, index) => ({
+        address: wallets[index].address,
+        wallet: wallets[index],
+
+        hasRetrievalErrors: (results[0][index].status === "failure"),
+
+        zkSyncEthBalance: (results[0][index].result || 0n)
+      }))
+      setInfo(infos)
+    })
+  }, [wallets]);
+
   return (
     <>
       <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
@@ -54,9 +125,9 @@ function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
         Wallet View
       </h2>
       <div className="flex flex-wrap gap-1.5 pt-2">
-        {wallets.map(w => (<WalletOverview wallet={w} key={w.address}></WalletOverview>))}
+        {info && info.map(w => (<WalletOverview walletInfo={w} key={w.address}></WalletOverview>))}
       </div>
-      <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0">
+      {/* <h2 className="mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0">
         Actions View
       </h2>
       <ActionName name="Orbiter" />
@@ -66,7 +137,7 @@ function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
       <ActionName name="StarkNet" />
       <div className="flex flex-wrap gap-1.5 pt-2">
         {wallets.map(w => (<WalletAction wallet={w} key={`action-o-z-a-${w.address}`}></WalletAction>))}
-      </div>
+      </div> */}
     </>
   )
 }
@@ -93,7 +164,7 @@ export default function Home() {
   const [wallets, setWallets] = useState<PrivateKeyAccount[]>([]);
 
   return (
-    <main className="flex min-h-screen flex-col p-4">
+    <main className="flex min-h-screen flex-col lg:p-24 p-0">
       {wallets.length > 0 ? (<DefiPortfolio wallets={wallets} />) : (<WalletImporter setWallets={setWallets} />)}
     </main>
   )
