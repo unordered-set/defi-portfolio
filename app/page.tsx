@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
+import { ChangeEvent } from 'react';
 
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -20,9 +21,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Input } from "@/components/ui/input"
 
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'
-import { parseAbi, createPublicClient, http, formatEther } from 'viem';
+import { parseAbi, createPublicClient, http, formatEther, parseEther, createWalletClient } from 'viem';
 import { zkSync, Chain } from 'viem/chains';
 
 interface WalletInfo {
@@ -38,7 +40,116 @@ const multicallABI = parseAbi([
   'function getEthBalance(address addr) public view returns (uint256 balance)',
 ])
 
+interface TransactionInfo {
+  chain: Chain,
+  status: "unknown" | "inProgress" | "reverted" | "success",
+  hash: `0x${string}`,
+  description: string | undefined,
+}
+
+async function sendOrbiterTxZksyncToArbitrum(wallet: PrivateKeyAccount, amount: string): Promise<`0x${string}`> {
+  const zkSyncOrbiter = "0xee73323912a4e3772b74ed0ca1595a152b0ef282";
+  const ending = 9002n;
+
+  let amountToSendParsed = 0n;
+
+  if (amount === "MAX") {
+    const publicClient = createPublicClient({
+      chain: zkSync,
+      transport: http(),
+    })
+    const balance = (await publicClient.getBalance({ address: wallet.address }));
+    const gasRequirements = await publicClient.estimateGas({
+      account: wallet,
+      value: balance,
+      to: zkSyncOrbiter,
+    })
+    amountToSendParsed = (balance - gasRequirements) / 10000n * 10000n + ending;
+  } else {
+    amountToSendParsed = parseEther(amount) / 10000n * 10000n + ending;
+  }
+
+  if (amountToSendParsed < parseEther("0.05")) {
+    throw "Orbiter: too low amount"
+  }
+
+  const wc = createWalletClient({
+    account: wallet,
+    chain: zkSync,
+    transport: http(),
+  })
+
+  return await wc.sendTransaction({
+    account: wallet,
+    value: amountToSendParsed,
+    to: zkSyncOrbiter,
+  })
+}
+
+function RecentTransaction({ tx }: { tx: TransactionInfo }) {
+  let txCol = '';
+  switch (tx.status) {
+    case "reverted":
+      txCol = "text-red-600";
+      break;
+    case "success":
+      txCol = "text-green-600";
+      break;
+    case "unknown":
+      txCol = "text-grey-600";
+      break;
+    case "inProgress":
+      txCol = "text-amber-600";
+      break;
+  }
+  return (
+    <a className={`${txCol} text-xs`}
+      href={tx.chain.blockExplorers?.default.url + '/tx/' + tx.hash}>
+      {tx.description || tx.hash}
+    </a>)
+}
+
+interface ActionsState {
+  orbiterZksyncArbitrumValue: string | undefined,
+}
+
 function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
+  const [actionsState, setActionsState] = useState<ActionsState>({});
+  const [recentTransactions, setRecentTransactions] = useState<TransactionInfo[]>([]);
+  const getEtherWithPrecison = (eth: bigint, precision: number = 3) => {
+    const formattedEther = formatEther(walletInfo.zkSyncEthBalance);
+    const dotPos = formattedEther.indexOf(".");
+    return formattedEther.substring(0, dotPos + 1 + precision);
+  }
+
+  useEffect(() => {
+    const txUpdateInterval = 10000;
+    const timerToken = setInterval(() => {
+      recentTransactions
+        .filter(tx => tx.status !== "success" && tx.status !== "reverted")
+        .forEach(tx => {
+          const publicClient = createPublicClient({
+            chain: tx.chain,
+            transport: http()
+          })
+          publicClient.getTransactionReceipt({ hash: tx.hash }).then(r => {
+            const updatedTransactions = [...recentTransactions];
+            for (const rtx of updatedTransactions) {
+              if (rtx.hash !== r.transactionHash) continue;
+              if (rtx.status === "reverted" || rtx.status === "success") return;
+              rtx.status = r.status;
+            }
+            setRecentTransactions(updatedTransactions);
+          }).catch(e => {
+            console.error("Error", e, "on getting recipient")
+          })
+        })
+    }, txUpdateInterval);
+    return () => {
+      clearInterval(timerToken);
+    }
+  }, [recentTransactions])
+
   return (
     <Card>
       <CardHeader>
@@ -46,20 +157,59 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
         <CardDescription>{walletInfo.address}</CardDescription>
       </CardHeader>
       <CardContent>
+        <h6 className="text-sm font-semibold">Last Txns</h6>
+        {recentTransactions.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {recentTransactions.map(t => (<RecentTransaction tx={t} />))}
+          </div>)
+        }
+        <p className="text-xs text-neutral-400">
+          <a className="underline text-sky-500 decoration-sky-500 pr-2" href={`https://debank.com/profile/${walletInfo.address}/history`}>View on Debank</a>
+          Become ambassador to see last transactions inline!
+        </p>
+        <p className="text-xs text-neutral-400">Status of the second transaction for bridging will be available for premium users.</p>
+        <h6 className="text-sm font-semibold pt-2">Proxy</h6>
+        <p className="text-xs text-neutral-400">Will be available for premium users.</p>
+        <h6 className="text-sm font-semibold pt-2">Flow builder</h6>
+        <p className="text-xs text-neutral-400">Will be available for premium users.</p>
+        <h5 className="text-base font-semibold pt-4">Balances</h5>
         <div className="grid gap-2 grid-cols-2">
           <div>ZK Sync ERA ETH</div>
           <div>
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger>{((formattedEther: string) => {
-                  const dotPos = formattedEther.indexOf(".");
-                  return formattedEther.substring(0, dotPos + 4);
-                })(formatEther(walletInfo.zkSyncEthBalance))}</TooltipTrigger>
+                <TooltipTrigger>{getEtherWithPrecison(walletInfo.zkSyncEthBalance)}</TooltipTrigger>
                 <TooltipContent>
                   <p>RAW: {walletInfo.zkSyncEthBalance.toString()}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+          </div>
+        </div>
+        {/* ^ end of balances */}
+        <h5 className="text-base font-semibold pt-4">Actions</h5>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            {/* TODO: sort actions wrt value */}
+            <a>Orbiter.Finance <span className="text-xs text-neutral-400">ZKSync -&gt; Arbitrum</span></a>
+            <Input className='w-24'
+              placeholder={`~ ${getEtherWithPrecison(walletInfo.zkSyncEthBalance)}`}
+              value={actionsState.orbiterZksyncArbitrumValue}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: e.target.value })} />
+            <Button variant="outline" onClick={() => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: "MAX" })}>Max</Button>
+            <Button disabled={actionsState.orbiterZksyncArbitrumValue === undefined}
+                    onClick={async () => {
+              const txHash = await sendOrbiterTxZksyncToArbitrum(walletInfo.wallet, actionsState.orbiterZksyncArbitrumValue!)
+              setRecentTransactions([
+                {
+                  chain: zkSync,
+                  hash: txHash,
+                  status: "inProgress",
+                  description: `Orbiter: ZKSync -> Arbitrum, ${actionsState.orbiterZksyncArbitrumValue!} ETH`
+                },
+                ...recentTransactions
+              ])
+            }}>Run</Button>
           </div>
         </div>
       </CardContent>
