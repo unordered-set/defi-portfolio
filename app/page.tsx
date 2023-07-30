@@ -115,7 +115,7 @@ async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: strin
     })
     gasPrice = await publicClient.getGasPrice() * 12n / 10n;
     console.log("Balance", balance, "GasPrice", gasPrice, "GasEstimate", gasRequirements)
-    amountToSendParsed = (balance - gasPrice * gasRequirements) / 10000n * 10000n;
+    amountToSendParsed = (balance - gasPrice * gasRequirements);
   } else {
     amountToSendParsed = parseEther(amount) / 10000n * 10000n;
   }
@@ -132,7 +132,7 @@ async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: strin
     to: ethBaseBridge,
 
     gas: gasRequirements,
-    maxPriorityFeePerGas: 0n,
+    maxPriorityFeePerGas: 100000000n,
     maxFeePerGas: gasPrice,
   })
 }
@@ -253,7 +253,7 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-baseline gap-1.5">
             {/* TODO: sort actions wrt value */}
-            <div>
+            <div className="flex flex-wrap items-baseline gap-1.5">
               <a>Orbiter.Finance <span className="text-xs text-neutral-400">ZKSync -&gt; Arbitrum</span></a>
               <Input className='w-24'
                 placeholder={`~ ${getEtherWithPrecison(walletInfo.zkSyncEthBalance)}`}
@@ -274,7 +274,7 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
                 ])
               }}>Run</Button>
             </div>
-            <div>
+            <div className="flex flex-wrap items-baseline gap-1.5">
               <a>Base bridge<span className="text-xs text-neutral-400">Mainnet -&gt; Base</span></a>
               <Input className='w-24'
                      placeholder={`~ ${getEtherWithPrecison(walletInfo.mainnetEthBalance)}`}
