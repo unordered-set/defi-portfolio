@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input"
 
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'
 import { parseAbi, createPublicClient, http, formatEther, parseEther, createWalletClient } from 'viem';
-import { zkSync, mainnet, Chain } from 'viem/chains';
+import { zkSync, mainnet, base, Chain } from 'viem/chains';
 
 interface WalletInfo {
   address: string,
@@ -34,6 +34,7 @@ interface WalletInfo {
   hasRetrievalErrors: boolean,
   zkSyncEthBalance: bigint,
   mainnetEthBalance: bigint,
+  baseEthBalance: bigint
 }
 
 // Even though multicall3 provides a fn to get balance, viem stripped it off.
@@ -247,6 +248,17 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
               </Tooltip>
             </TooltipProvider>
           </div>
+          <div>Base ETH</div>
+          <div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>{getEtherWithPrecison(walletInfo.baseEthBalance)}</TooltipTrigger>
+                <TooltipContent>
+                  <p>RAW: {walletInfo.baseEthBalance.toString()}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
         {/* ^ end of balances */}
         <h5 className="text-base font-semibold pt-4">Actions</h5>
@@ -342,7 +354,8 @@ function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
   useEffect(() => {
     const zkSyncBalances = getMulticall3Balances(wallets, zkSync);
     const mainnetBalances = getMulticall3Balances(wallets, mainnet);
-    Promise.all([zkSyncBalances, mainnetBalances]).then(results => {
+    const baseBalances = getMulticall3Balances(wallets, base);
+    Promise.all([zkSyncBalances, mainnetBalances, baseBalances]).then(results => {
       const infos = (new Array(wallets.length).fill(0)).map((_, index) => ({
         address: wallets[index].address,
         wallet: wallets[index],
@@ -350,7 +363,8 @@ function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
         hasRetrievalErrors: ((results[0][index].status === "failure") || (results[1][index].status === "failure")),
 
         zkSyncEthBalance: (results[0][index].result || 0n),
-        mainnetEthBalance: (results[1][index].result || 0n)
+        mainnetEthBalance: (results[1][index].result || 0n),
+        baseEthBalance: (results[2][index].result || 0n)
       }))
       setInfo(infos)
     })
