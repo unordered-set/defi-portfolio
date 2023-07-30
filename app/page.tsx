@@ -137,6 +137,39 @@ async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: strin
     maxFeePerGas: gasPrice,
   })
 }
+
+async function mintBaseDeveloperNFT(wallet: PrivateKeyAccount) {
+  const wc = createWalletClient({
+    account: wallet,
+    chain: base,
+    transport: http(),
+  })
+
+  const signature = await wc.signMessage({
+    account: wallet,
+    message: "all your base are belong to you."
+  })
+
+  const baseDevNftAddress = "0x1fc10ef15e041c5d3c54042e52eb0c54cb9b710c";
+  const abi = parseAbi([
+    'function mint(bytes memory signature) external returns (uint256)',
+  ])
+
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http(),
+  })
+
+  const { request } = await publicClient.simulateContract({
+    account: wallet,
+    address: baseDevNftAddress,
+    abi,
+    functionName: 'mint',
+    args: [signature]
+  })
+  return await wc.writeContract(request)
+}
+
 function RecentTransaction({ tx }: { tx: TransactionInfo }) {
   let txCol = '';
   switch (tx.status) {
@@ -263,17 +296,16 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
         {/* ^ end of balances */}
         <h5 className="text-base font-semibold pt-4">Actions</h5>
         <div className="flex flex-col gap-2">
+          {/* TODO: sort actions wrt value */}
           <div className="flex flex-wrap items-baseline gap-1.5">
-            {/* TODO: sort actions wrt value */}
-            <div className="flex flex-wrap items-baseline gap-1.5">
-              <a>Orbiter.Finance <span className="text-xs text-neutral-400">ZKSync -&gt; Arbitrum</span></a>
-              <Input className='w-24'
-                placeholder={`~ ${getEtherWithPrecison(walletInfo.zkSyncEthBalance)}`}
-                value={actionsState.orbiterZksyncArbitrumValue}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: e.target.value })} />
-              <Button variant="outline" onClick={() => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: "MAX" })}>Max</Button>
-              <Button disabled={actionsState.orbiterZksyncArbitrumValue === undefined}
-                      onClick={async () => {
+            <a className="grow">Orbiter.Finance <span className="text-xs text-neutral-400">ZKSync -&gt; Arbitrum</span></a>
+            <Input className='w-24'
+              placeholder={`~ ${getEtherWithPrecison(walletInfo.zkSyncEthBalance)}`}
+              value={actionsState.orbiterZksyncArbitrumValue}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: e.target.value })} />
+            <Button variant="outline" onClick={() => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: "MAX" })}>Max</Button>
+            <Button disabled={actionsState.orbiterZksyncArbitrumValue === undefined}
+              onClick={async () => {
                 const txHash = await sendOrbiterTxZksyncToArbitrum(walletInfo.wallet, actionsState.orbiterZksyncArbitrumValue!)
                 setRecentTransactions([
                   {
@@ -285,45 +317,46 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
                   ...recentTransactions
                 ])
               }}>Run</Button>
-            </div>
-            <div className="flex flex-wrap items-baseline gap-1.5">
-              <a>Base bridge<span className="text-xs text-neutral-400">Mainnet -&gt; Base</span></a>
-              <Input className='w-24'
-                     placeholder={`~ ${getEtherWithPrecison(walletInfo.mainnetEthBalance)}`}
-                     value={actionsState.mainnetBaseBridgeValue}
-                     onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, mainnetBaseBridgeValue: e.target.value })} />
-              <Button variant="outline" onClick={() => setActionsState({ ...actionsState, mainnetBaseBridgeValue: "MAX" })}>Max</Button>
-              <Button disabled={actionsState.mainnetBaseBridgeValue === undefined}
-                      onClick={async () => {
-                        const txHash = await sendEthFromMainnetToBase(walletInfo.wallet, actionsState.mainnetBaseBridgeValue!)
-                        setRecentTransactions([
-                          {
-                            chain: mainnet,
-                            hash: txHash,
-                            status: "inProgress",
-                            description: `Base: Mainnet -> Base, ${actionsState.mainnetBaseBridgeValue!} ETH`
-                          },
-                          ...recentTransactions
-                        ])
+          </div>
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <a className="grow">Base bridge <span className="text-xs text-neutral-400">Mainnet -&gt; Base</span></a>
+            <Input className='w-24'
+              placeholder={`~ ${getEtherWithPrecison(walletInfo.mainnetEthBalance)}`}
+              value={actionsState.mainnetBaseBridgeValue}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, mainnetBaseBridgeValue: e.target.value })} />
+            <Button variant="outline" onClick={() => setActionsState({ ...actionsState, mainnetBaseBridgeValue: "MAX" })}>Max</Button>
+            <Button disabled={actionsState.mainnetBaseBridgeValue === undefined}
+              onClick={async () => {
+                const txHash = await sendEthFromMainnetToBase(walletInfo.wallet, actionsState.mainnetBaseBridgeValue!)
+                setRecentTransactions([
+                  {
+                    chain: mainnet,
+                    hash: txHash,
+                    status: "inProgress",
+                    description: `Base: Mainnet -> Base, ${actionsState.mainnetBaseBridgeValue!} ETH`
+                  },
+                  ...recentTransactions
+                ])
               }}>Run</Button>
-            </div>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <a className="grow">Base.org: Mint Dev NFT</a>
+            <Button onClick={async () => {
+              const txHash = await mintBaseDeveloperNFT(walletInfo.wallet);
+              setRecentTransactions([
+                {
+                  chain: base,
+                  hash: txHash,
+                  status: "inProgress",
+                  description: `Minting Base Dev NFT`
+                },
+                ...recentTransactions
+              ])
+            }}>Run</Button>
           </div>
         </div>
       </CardContent>
-    </Card>
-  )
-}
-
-function ActionName({ name }: { name: string }) {
-  return (<div className="text-lg font-semibold mt-8">{name}</div>)
-}
-
-function WalletAction({ wallet }: { wallet: PrivateKeyAccount }) {
-  return (
-    <div className="flex flex-col">
-      <span>{wallet.address}</span>
-      <Button>Go</Button>
-    </div>
+    </Card >
   )
 }
 
