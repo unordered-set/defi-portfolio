@@ -64,7 +64,8 @@ async function sendOrbiterTxZksyncToArbitrum(wallet: PrivateKeyAccount, amount: 
       value: balance,
       to: zkSyncOrbiter,
     })
-    amountToSendParsed = (balance - gasRequirements) / 10000n * 10000n + ending;
+    const gasPrice = await publicClient.getGasPrice()
+    amountToSendParsed = (balance - gasPrice * gasRequirements) / 10000n * 10000n + ending;
   } else {
     amountToSendParsed = parseEther(amount) / 10000n * 10000n + ending;
   }
