@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input"
 
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'
 import { parseAbi, createPublicClient, http, formatEther, parseEther, createWalletClient } from 'viem';
-import { zkSync, Chain } from 'viem/chains';
+import { zkSync, mainnet, base, Chain } from 'viem/chains';
 
 interface WalletInfo {
   address: string,
@@ -33,6 +33,8 @@ interface WalletInfo {
 
   hasRetrievalErrors: boolean,
   zkSyncEthBalance: bigint,
+  mainnetEthBalance: bigint,
+  baseEthBalance: bigint
 }
 
 // Even though multicall3 provides a fn to get balance, viem stripped it off.
@@ -94,6 +96,47 @@ async function sendOrbiterTxZksyncToArbitrum(wallet: PrivateKeyAccount, amount: 
   })
 }
 
+async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: string): Promise<`0x${string}`> {
+  const ethBaseBridge = "0x49048044D57e1C92A77f79988d21Fa8fAF74E97e";
+
+  let amountToSendParsed = 0n;
+
+  let gasRequirements, gasPrice;
+
+  if (amount === "MAX") {
+    const publicClient = createPublicClient({
+      chain: mainnet,
+      transport: http(),
+    })
+    const balance = (await publicClient.getBalance({ address: wallet.address }));
+    gasRequirements = await publicClient.estimateGas({
+      account: wallet,
+      value: balance,
+      to: ethBaseBridge,
+    })
+    gasPrice = await publicClient.getGasPrice() * 12n / 10n;
+    console.log("Balance", balance, "GasPrice", gasPrice, "GasEstimate", gasRequirements)
+    amountToSendParsed = (balance - gasPrice * gasRequirements);
+  } else {
+    amountToSendParsed = parseEther(amount) / 10000n * 10000n;
+  }
+
+  const wc = createWalletClient({
+    account: wallet,
+    chain: mainnet,
+    transport: http(),
+  })
+
+  return await wc.sendTransaction({
+    account: wallet,
+    value: amountToSendParsed,
+    to: ethBaseBridge,
+
+    gas: gasRequirements,
+    maxPriorityFeePerGas: 100000000n,
+    maxFeePerGas: gasPrice,
+  })
+}
 function RecentTransaction({ tx }: { tx: TransactionInfo }) {
   let txCol = '';
   switch (tx.status) {
@@ -119,13 +162,14 @@ function RecentTransaction({ tx }: { tx: TransactionInfo }) {
 
 interface ActionsState {
   orbiterZksyncArbitrumValue: string | undefined,
+  mainnetBaseBridgeValue: string | undefined,
 }
 
 function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
   const [actionsState, setActionsState] = useState<ActionsState>(({} as ActionsState));
   const [recentTransactions, setRecentTransactions] = useState<TransactionInfo[]>([]);
   const getEtherWithPrecison = (eth: bigint, precision: number = 3) => {
-    const formattedEther = formatEther(walletInfo.zkSyncEthBalance);
+    const formattedEther = formatEther(eth);
     const dotPos = formattedEther.indexOf(".");
     return formattedEther.substring(0, dotPos + 1 + precision);
   }
@@ -193,31 +237,76 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
               </Tooltip>
             </TooltipProvider>
           </div>
+          <div>Mainnet ETH</div>
+          <div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>{getEtherWithPrecison(walletInfo.mainnetEthBalance)}</TooltipTrigger>
+                <TooltipContent>
+                  <p>RAW: {walletInfo.mainnetEthBalance.toString()}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <div>Base ETH</div>
+          <div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>{getEtherWithPrecison(walletInfo.baseEthBalance)}</TooltipTrigger>
+                <TooltipContent>
+                  <p>RAW: {walletInfo.baseEthBalance.toString()}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
         {/* ^ end of balances */}
         <h5 className="text-base font-semibold pt-4">Actions</h5>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-baseline gap-1.5">
             {/* TODO: sort actions wrt value */}
-            <a>Orbiter.Finance <span className="text-xs text-neutral-400">ZKSync -&gt; Arbitrum</span></a>
-            <Input className='w-24'
-              placeholder={`~ ${getEtherWithPrecison(walletInfo.zkSyncEthBalance)}`}
-              value={actionsState.orbiterZksyncArbitrumValue}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: e.target.value })} />
-            <Button variant="outline" onClick={() => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: "MAX" })}>Max</Button>
-            <Button disabled={actionsState.orbiterZksyncArbitrumValue === undefined}
-                    onClick={async () => {
-              const txHash = await sendOrbiterTxZksyncToArbitrum(walletInfo.wallet, actionsState.orbiterZksyncArbitrumValue!)
-              setRecentTransactions([
-                {
-                  chain: zkSync,
-                  hash: txHash,
-                  status: "inProgress",
-                  description: `Orbiter: ZKSync -> Arbitrum, ${actionsState.orbiterZksyncArbitrumValue!} ETH`
-                },
-                ...recentTransactions
-              ])
-            }}>Run</Button>
+            <div className="flex flex-wrap items-baseline gap-1.5">
+              <a>Orbiter.Finance <span className="text-xs text-neutral-400">ZKSync -&gt; Arbitrum</span></a>
+              <Input className='w-24'
+                placeholder={`~ ${getEtherWithPrecison(walletInfo.zkSyncEthBalance)}`}
+                value={actionsState.orbiterZksyncArbitrumValue}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: e.target.value })} />
+              <Button variant="outline" onClick={() => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: "MAX" })}>Max</Button>
+              <Button disabled={actionsState.orbiterZksyncArbitrumValue === undefined}
+                      onClick={async () => {
+                const txHash = await sendOrbiterTxZksyncToArbitrum(walletInfo.wallet, actionsState.orbiterZksyncArbitrumValue!)
+                setRecentTransactions([
+                  {
+                    chain: zkSync,
+                    hash: txHash,
+                    status: "inProgress",
+                    description: `Orbiter: ZKSync -> Arbitrum, ${actionsState.orbiterZksyncArbitrumValue!} ETH`
+                  },
+                  ...recentTransactions
+                ])
+              }}>Run</Button>
+            </div>
+            <div className="flex flex-wrap items-baseline gap-1.5">
+              <a>Base bridge<span className="text-xs text-neutral-400">Mainnet -&gt; Base</span></a>
+              <Input className='w-24'
+                     placeholder={`~ ${getEtherWithPrecison(walletInfo.mainnetEthBalance)}`}
+                     value={actionsState.mainnetBaseBridgeValue}
+                     onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, mainnetBaseBridgeValue: e.target.value })} />
+              <Button variant="outline" onClick={() => setActionsState({ ...actionsState, mainnetBaseBridgeValue: "MAX" })}>Max</Button>
+              <Button disabled={actionsState.mainnetBaseBridgeValue === undefined}
+                      onClick={async () => {
+                        const txHash = await sendEthFromMainnetToBase(walletInfo.wallet, actionsState.mainnetBaseBridgeValue!)
+                        setRecentTransactions([
+                          {
+                            chain: mainnet,
+                            hash: txHash,
+                            status: "inProgress",
+                            description: `Base: Mainnet -> Base, ${actionsState.mainnetBaseBridgeValue!} ETH`
+                          },
+                          ...recentTransactions
+                        ])
+              }}>Run</Button>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -264,18 +353,23 @@ function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
 
   useEffect(() => {
     const zkSyncBalances = getMulticall3Balances(wallets, zkSync);
-    Promise.all([zkSyncBalances]).then(results => {
+    const mainnetBalances = getMulticall3Balances(wallets, mainnet);
+    const baseBalances = getMulticall3Balances(wallets, base);
+    Promise.all([zkSyncBalances, mainnetBalances, baseBalances]).then(results => {
       const infos = (new Array(wallets.length).fill(0)).map((_, index) => ({
         address: wallets[index].address,
         wallet: wallets[index],
 
-        hasRetrievalErrors: (results[0][index].status === "failure"),
+        hasRetrievalErrors: ((results[0][index].status === "failure") || (results[1][index].status === "failure")),
 
-        zkSyncEthBalance: (results[0][index].result || 0n)
+        zkSyncEthBalance: (results[0][index].result || 0n),
+        mainnetEthBalance: (results[1][index].result || 0n),
+        baseEthBalance: (results[2][index].result || 0n)
       }))
       setInfo(infos)
     })
   }, [wallets]);
+
 
   return (
     <>
