@@ -114,7 +114,7 @@ interface ActionsState {
 }
 
 function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
-  const [actionsState, setActionsState] = useState<ActionsState>({});
+  const [actionsState, setActionsState] = useState<ActionsState>(({} as ActionsState));
   const [recentTransactions, setRecentTransactions] = useState<TransactionInfo[]>([]);
   const getEtherWithPrecison = (eth: bigint, precision: number = 3) => {
     const formattedEther = formatEther(walletInfo.zkSyncEthBalance);
