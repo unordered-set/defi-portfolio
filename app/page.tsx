@@ -53,18 +53,20 @@ async function sendOrbiterTxZksyncToArbitrum(wallet: PrivateKeyAccount, amount: 
 
   let amountToSendParsed = 0n;
 
+  let gasRequirements, gasPrice;
+
   if (amount === "MAX") {
     const publicClient = createPublicClient({
       chain: zkSync,
       transport: http(),
     })
     const balance = (await publicClient.getBalance({ address: wallet.address }));
-    const gasRequirements = await publicClient.estimateGas({
+    gasRequirements = await publicClient.estimateGas({
       account: wallet,
       value: balance,
       to: zkSyncOrbiter,
     })
-    const gasPrice = await publicClient.getGasPrice() * 12n / 10n;
+    gasPrice = await publicClient.getGasPrice() * 12n / 10n;
     console.log("GasPrice", gasPrice, "GasEstimate", gasRequirements)
     amountToSendParsed = (balance - gasPrice * gasRequirements) / 10000n * 10000n + ending;
   } else {
@@ -85,6 +87,10 @@ async function sendOrbiterTxZksyncToArbitrum(wallet: PrivateKeyAccount, amount: 
     account: wallet,
     value: amountToSendParsed,
     to: zkSyncOrbiter,
+
+    gas: gasRequirements,
+    maxPriorityFeePerGas: 0n,
+    maxFeePerGas: gasPrice,
   })
 }
 
