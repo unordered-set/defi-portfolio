@@ -23,6 +23,9 @@ import {
 } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 
+import { Toaster } from "@/components/ui/toaster"
+import { useToast } from "@/components/ui/use-toast"
+
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'
 import { parseAbi, createPublicClient, http, formatEther, parseEther, createWalletClient } from 'viem';
 import { zkSync, mainnet, base, Chain } from 'viem/chains';
@@ -34,12 +37,19 @@ interface WalletInfo {
   hasRetrievalErrors: boolean,
   zkSyncEthBalance: bigint,
   mainnetEthBalance: bigint,
-  baseEthBalance: bigint
+  baseEthBalance: bigint,
+  baseDevNfts: bigint,
 }
+
+const baseDevNftAddress: `0x${string}` = "0x1fc10ef15e041c5d3c54042e52eb0c54cb9b710c";
 
 // Even though multicall3 provides a fn to get balance, viem stripped it off.
 const multicallABI = parseAbi([
   'function getEthBalance(address addr) public view returns (uint256 balance)',
+])
+
+const erc721Abi = parseAbi([
+  'function balanceOf(address owner) public view returns (uint256)',
 ])
 
 interface TransactionInfo {
@@ -101,7 +111,7 @@ async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: strin
 
   let amountToSendParsed = 0n;
 
-  let gasRequirements, gasPrice;
+  let gasRequirements = 71000n, gasPrice;
 
   if (amount === "MAX") {
     const publicClient = createPublicClient({
@@ -109,16 +119,10 @@ async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: strin
       transport: http(),
     })
     const balance = (await publicClient.getBalance({ address: wallet.address }));
-    gasRequirements = await publicClient.estimateGas({
-      account: wallet,
-      value: balance,
-      to: ethBaseBridge,
-    })
-    gasPrice = await publicClient.getGasPrice() * 12n / 10n;
-    console.log("Balance", balance, "GasPrice", gasPrice, "GasEstimate", gasRequirements)
+    gasPrice = (await publicClient.getGasPrice()) * 12n / 10n;
     amountToSendParsed = (balance - gasPrice * gasRequirements);
   } else {
-    amountToSendParsed = parseEther(amount) / 10000n * 10000n;
+    amountToSendParsed = parseEther(amount);
   }
 
   const wc = createWalletClient({
@@ -150,7 +154,6 @@ async function mintBaseDeveloperNFT(wallet: PrivateKeyAccount) {
     message: "all your base are belong to you."
   })
 
-  const baseDevNftAddress = "0x1fc10ef15e041c5d3c54042e52eb0c54cb9b710c";
   const abi = parseAbi([
     'function mint(bytes memory signature) external returns (uint256)',
   ])
@@ -206,6 +209,8 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
     const dotPos = formattedEther.indexOf(".");
     return formattedEther.substring(0, dotPos + 1 + precision);
   }
+
+  const { toast } = useToast()
 
   useEffect(() => {
     const txUpdateInterval = 10000;
@@ -306,16 +311,23 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
             <Button variant="outline" onClick={() => setActionsState({ ...actionsState, orbiterZksyncArbitrumValue: "MAX" })}>Max</Button>
             <Button disabled={actionsState.orbiterZksyncArbitrumValue === undefined}
               onClick={async () => {
-                const txHash = await sendOrbiterTxZksyncToArbitrum(walletInfo.wallet, actionsState.orbiterZksyncArbitrumValue!)
-                setRecentTransactions([
-                  {
-                    chain: zkSync,
-                    hash: txHash,
-                    status: "inProgress",
-                    description: `Orbiter: ZKSync -> Arbitrum, ${actionsState.orbiterZksyncArbitrumValue!} ETH`
-                  },
-                  ...recentTransactions
-                ])
+                try {
+                  const txHash = await sendOrbiterTxZksyncToArbitrum(walletInfo.wallet, actionsState.orbiterZksyncArbitrumValue!)
+                  setRecentTransactions([
+                    {
+                      chain: zkSync,
+                      hash: txHash,
+                      status: "inProgress",
+                      description: `Orbiter: ZKSync -> Arbitrum, ${actionsState.orbiterZksyncArbitrumValue!} ETH`
+                    },
+                    ...recentTransactions
+                  ])
+                } catch (e) {
+                  toast({
+                    title: "Error sending tx",
+                    description: `${e}`,
+                  })
+                }
               }}>Run</Button>
           </div>
           <div className="flex flex-wrap items-baseline gap-1.5">
@@ -327,31 +339,46 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
             <Button variant="outline" onClick={() => setActionsState({ ...actionsState, mainnetBaseBridgeValue: "MAX" })}>Max</Button>
             <Button disabled={actionsState.mainnetBaseBridgeValue === undefined}
               onClick={async () => {
-                const txHash = await sendEthFromMainnetToBase(walletInfo.wallet, actionsState.mainnetBaseBridgeValue!)
-                setRecentTransactions([
-                  {
-                    chain: mainnet,
-                    hash: txHash,
-                    status: "inProgress",
-                    description: `Base: Mainnet -> Base, ${actionsState.mainnetBaseBridgeValue!} ETH`
-                  },
-                  ...recentTransactions
-                ])
+                try {
+                  const txHash = await sendEthFromMainnetToBase(walletInfo.wallet, actionsState.mainnetBaseBridgeValue!)
+                  setRecentTransactions([
+                    {
+                      chain: mainnet,
+                      hash: txHash,
+                      status: "inProgress",
+                      description: `Base: Mainnet -> Base, ${actionsState.mainnetBaseBridgeValue!} ETH`
+                    },
+                    ...recentTransactions
+                  ])
+                } catch (e) {
+                  toast({
+                    title: "Error sending tx",
+                    description: `${e}`,
+                  })
+                }
               }}>Run</Button>
           </div>
           <div className="flex flex-wrap items-baseline gap-1.5">
             <a className="grow">Base.org: Mint Dev NFT</a>
+            <a className="grow">In wallet: {walletInfo.baseDevNfts.toString()}</a>
             <Button onClick={async () => {
-              const txHash = await mintBaseDeveloperNFT(walletInfo.wallet);
-              setRecentTransactions([
-                {
-                  chain: base,
-                  hash: txHash,
-                  status: "inProgress",
-                  description: `Minting Base Dev NFT`
-                },
-                ...recentTransactions
-              ])
+              try {
+                const txHash = await mintBaseDeveloperNFT(walletInfo.wallet);
+                setRecentTransactions([
+                  {
+                    chain: base,
+                    hash: txHash,
+                    status: "inProgress",
+                    description: `Minting Base Dev NFT`
+                  },
+                  ...recentTransactions
+                ])
+              } catch (e) {
+                toast({
+                  title: "Error sending tx",
+                  description: `${e}`,
+                })
+              }
             }}>Run</Button>
           </div>
         </div>
@@ -381,6 +408,24 @@ async function getMulticall3Balances(wallets: PrivateKeyAccount[], chainInfo: Ch
   })
 }
 
+async function getBaseNftDevBalances(wallets: PrivateKeyAccount[]) {
+  const devNftContract = {
+    address: baseDevNftAddress,
+    abi: erc721Abi,
+  }
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http()
+  })
+  return await publicClient.multicall({
+    contracts: wallets.map(w => ({
+      ...devNftContract,
+      functionName: 'balanceOf',
+      args: [w.address]
+    }))
+  })
+}
+
 function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
   const [info, setInfo] = useState<WalletInfo[]>();
 
@@ -388,16 +433,29 @@ function DefiPortfolio({ wallets }: { wallets: PrivateKeyAccount[] }) {
     const zkSyncBalances = getMulticall3Balances(wallets, zkSync);
     const mainnetBalances = getMulticall3Balances(wallets, mainnet);
     const baseBalances = getMulticall3Balances(wallets, base);
-    Promise.all([zkSyncBalances, mainnetBalances, baseBalances]).then(results => {
+    const getBaseDevNFTBalances = getBaseNftDevBalances(wallets);
+    Promise.all([
+      zkSyncBalances,
+      mainnetBalances,
+      baseBalances,
+      getBaseDevNFTBalances,
+    ]).then(results => {
       const infos = (new Array(wallets.length).fill(0)).map((_, index) => ({
         address: wallets[index].address,
         wallet: wallets[index],
 
-        hasRetrievalErrors: ((results[0][index].status === "failure") || (results[1][index].status === "failure")),
+        hasRetrievalErrors: ((
+          results[0][index].status === "failure") ||
+          (results[1][index].status === "failure") ||
+          (results[2][index].status === "failure") ||
+          (results[3][index].status === "failure") ||
+          false
+        ),
 
         zkSyncEthBalance: (results[0][index].result || 0n),
         mainnetEthBalance: (results[1][index].result || 0n),
-        baseEthBalance: (results[2][index].result || 0n)
+        baseEthBalance: (results[2][index].result || 0n),
+        baseDevNfts: (results[3][index].result || 0n),
       }))
       setInfo(infos)
     })
@@ -454,6 +512,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col lg:p-24 p-0">
       {wallets.length > 0 ? (<DefiPortfolio wallets={wallets} />) : (<WalletImporter setWallets={setWallets} />)}
+      <Toaster />
     </main>
   )
 }
