@@ -28,7 +28,7 @@ import { useToast } from "@/components/ui/use-toast"
 
 import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts'
 import { parseAbi, createPublicClient, http, formatEther, parseEther, createWalletClient } from 'viem';
-import { zkSync, mainnet, base, Chain } from 'viem/chains';
+import { zkSync, mainnet, base, zora, Chain } from 'viem/chains';
 
 interface WalletInfo {
   address: string,
@@ -110,16 +110,16 @@ async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: strin
   const ethBaseBridge = "0x49048044D57e1C92A77f79988d21Fa8fAF74E97e";
 
   let amountToSendParsed = 0n;
-
-  let gasRequirements = 71000n, gasPrice;
+  
+  let gasRequirements = 71000n;
+  const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: http(),
+  });
+  const gasPrice = (await publicClient.getGasPrice()) * 12n / 10n;
 
   if (amount === "MAX") {
-    const publicClient = createPublicClient({
-      chain: mainnet,
-      transport: http(),
-    })
     const balance = (await publicClient.getBalance({ address: wallet.address }));
-    gasPrice = (await publicClient.getGasPrice()) * 12n / 10n;
     amountToSendParsed = (balance - gasPrice * gasRequirements);
   } else {
     amountToSendParsed = parseEther(amount);
@@ -140,6 +140,50 @@ async function sendEthFromMainnetToBase(wallet: PrivateKeyAccount, amount: strin
     maxPriorityFeePerGas: 100000000n,
     maxFeePerGas: gasPrice,
   })
+}
+
+async function sendEthFromMainnetToZora(wallet: PrivateKeyAccount, amount: string) {
+  const ethZoraBridge = "0x1a0ad011913A150f69f6A19DF447A0CfD9551054";
+  let amountToSendParsed = 0n;
+
+  let gasRequirements = 81_285n;
+
+  const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: http(),
+  })
+  const gasPrice = (await publicClient.getGasPrice()) * 12n / 10n;
+  if (amount === "MAX") {
+    const balance = (await publicClient.getBalance({ address: wallet.address }));
+    amountToSendParsed = (balance - gasPrice * gasRequirements);
+  } else {
+    amountToSendParsed = parseEther(amount);
+  }
+
+  const wc = createWalletClient({
+    account: wallet,
+    chain: mainnet,
+    transport: http(),
+  })
+
+  const abi = parseAbi([
+    'function depositTransaction(address, uint256, uint64, bool, bytes) payable',
+  ])
+
+  const { request } = await publicClient.simulateContract({
+    account: wallet,
+    address: ethZoraBridge,
+    abi,
+    functionName: 'depositTransaction',
+    args: [wallet.address, amountToSendParsed, 100_000n, false, "0x"],
+
+    gas: gasRequirements,
+    maxPriorityFeePerGas: 100000000n,
+    maxFeePerGas: gasPrice,
+
+    value: amountToSendParsed,
+  })
+  return await wc.writeContract(request)
 }
 
 async function mintBaseDeveloperNFT(wallet: PrivateKeyAccount) {
@@ -199,6 +243,7 @@ function RecentTransaction({ tx }: { tx: TransactionInfo }) {
 interface ActionsState {
   orbiterZksyncArbitrumValue: string | undefined,
   mainnetBaseBridgeValue: string | undefined,
+  mainnetZoraBridgeValue: string | undefined,
 }
 
 function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
@@ -380,6 +425,34 @@ function WalletOverview({ walletInfo }: { walletInfo: WalletInfo }) {
                 })
               }
             }}>Run</Button>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <a className="grow">Zora bridge <span className="text-xs text-neutral-400">Mainnet -&gt; Zora</span></a>
+            <Input className='w-24'
+              placeholder={`~ ${getEtherWithPrecison(walletInfo.mainnetEthBalance)}`}
+              value={actionsState.mainnetZoraBridgeValue}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setActionsState({ ...actionsState, mainnetZoraBridgeValue: e.target.value })} />
+            <Button variant="outline" onClick={() => setActionsState({ ...actionsState, mainnetZoraBridgeValue: "MAX" })}>Max</Button>
+            <Button disabled={actionsState.mainnetZoraBridgeValue === undefined}
+              onClick={async () => {
+                try {
+                  const txHash = await sendEthFromMainnetToZora(walletInfo.wallet, actionsState.mainnetZoraBridgeValue!)
+                  setRecentTransactions([
+                    {
+                      chain: mainnet,
+                      hash: txHash,
+                      status: "inProgress",
+                      description: `Zora: Mainnet -> Zora, ${actionsState.mainnetZoraBridgeValue!} ETH`
+                    },
+                    ...recentTransactions
+                  ])
+                } catch (e) {
+                  toast({
+                    title: "Error sending tx",
+                    description: `${e}`,
+                  })
+                }
+              }}>Run</Button>
           </div>
         </div>
       </CardContent>
