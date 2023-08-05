@@ -583,7 +583,7 @@ export default function Home() {
   const [wallets, setWallets] = useState<PrivateKeyAccount[]>([]);
 
   return (
-    <main className="flex min-h-screen flex-col lg:p-24 p-0">
+    <main className="flex min-h-screen flex-col lg:p-24 p-1">
       {wallets.length > 0 ? (<DefiPortfolio wallets={wallets} />) : (<WalletImporter setWallets={setWallets} />)}
       <div className='flex pt-8 text-slate-300'>
         <div className="flex-1">DeFi Crystal by <a href="https://web3engineering.co.uk" className="hover:text-slate-700">web3engineering</a></div>
