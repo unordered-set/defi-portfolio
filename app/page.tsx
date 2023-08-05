@@ -585,6 +585,15 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col lg:p-24 p-0">
       {wallets.length > 0 ? (<DefiPortfolio wallets={wallets} />) : (<WalletImporter setWallets={setWallets} />)}
+      <div className='flex pt-8 text-slate-300'>
+        <div className="flex-1">DeFi Crystal by <a href="https://web3engineering.co.uk" className="hover:text-slate-700">web3engineering</a></div>
+        <div className="flex-initial">
+          <a href="https://t.me/defi_crystal" className="hover:text-slate-700">Telegram</a>
+          &nbsp;&nbsp;
+          <a href="https://discord.gg/886rCbDdg" className="hover:text-slate-700">Discord</a>
+          &nbsp;&nbsp;
+          <a href="https://github.com/unordered-set/defi-portfolio" className="hover:text-slate-700">GitHub</a></div>
+      </div>
       <Toaster />
     </main>
   )
