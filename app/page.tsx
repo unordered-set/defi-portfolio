@@ -85,7 +85,7 @@ async function sendOrbiterTxZksyncToArbitrum(wallet: PrivateKeyAccount, amount: 
     amountToSendParsed = parseEther(amount) / 10000n * 10000n + ending;
   }
 
-  if (amountToSendParsed < parseEther("0.05")) {
+  if (amountToSendParsed < parseEther("0.005")) {
     throw "Orbiter: too low amount"
   }
 
