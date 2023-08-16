@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { PrivateKeyAccount } from "viem";
 import { CollectedMetrics, IntegrationInfo, MetricsToDisplay } from "@/lib/types";
-import EigenLayer from "@/lib/integrations/eigenlayer";
-import { useEthereumBalances } from "@/lib/balances";
+import { useEthereumBalances, useZkSyncEraBalances } from "@/lib/balances";
 import WalletCard from "./walletcard";
 
-const defaultIntegrations = [EigenLayer]
+import EigenLayer from "@/lib/integrations/eigenlayer";
+import LibertasOmnibusZkSyncEra from "@/lib/integrations/libertasOmnibusZkSyncEra";
+
+const defaultIntegrations = [EigenLayer, LibertasOmnibusZkSyncEra]
 
 export default function PortfolioManager({ wallets }: { wallets: PrivateKeyAccount[] }) {
     const [integrations, setIntegrations] = useState<IntegrationInfo<any>[]>(defaultIntegrations);
@@ -21,11 +23,16 @@ export default function PortfolioManager({ wallets }: { wallets: PrivateKeyAccou
         enabled: allMetrics.includes("MainnetBalance"),
         wallets,
     })
+    const zkSyncEraBalances = useZkSyncEraBalances({
+        enabled: allMetrics.includes("ZkSyncEthBalance"),
+        wallets,
+    })
 
     return (<>
         {wallets.map((w, index) => {
             const context: CollectedMetrics = {
                 mainnetEther: ethereumBalances && ethereumBalances[index],
+                zksyncEraEther: zkSyncEraBalances && zkSyncEraBalances[index],
             }
             return (<WalletCard wallet={w} key={w.address} selectedIntegrations={integrations} selectedMetrics={allMetrics} collectedMetrics={context} />);
         })}

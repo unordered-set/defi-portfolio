@@ -2,6 +2,7 @@ import { CollectedMetrics, IntegrationInfo, MetricsToDisplay, TxInfo, UiContext 
 import { PrivateKeyAccount } from "viem";
 import { getEtherWithPrecison } from "@/lib/utils";
 import TransferAction from "./transferaction";
+import SimpleAction from "./simpleaction";
 
 import {
     Card,
@@ -46,6 +47,14 @@ function renderIntegration(integration: IntegrationInfo<any>, index: number, wal
                 action={v => ti.handler(wallet, v, context)}
             />)
     }
+    if (integration.widget === "SimpleAction") {
+        const ti = integration as IntegrationInfo<"SimpleAction">;
+        return (
+            <SimpleAction name={ti.widgetArgs[0]}
+                subname={ti.widgetArgs[1]}
+                action={() => ti.handler(wallet, context)}
+            />)
+    }
     return (<div key={index}>{integration.name} is not supported yet</div>)
 }
 
@@ -75,6 +84,8 @@ export default function WalletCard(
                 <div className="grid gap-2 grid-cols-2">
                     {selectedMetrics.includes("MainnetBalance") &&
                         (<BalanceMetrics name="Mainnet ETH" value={collectedMetrics.mainnetEther} />)}
+                    {selectedMetrics.includes("ZkSyncEthBalance") &&
+                        (<BalanceMetrics name="ZkSyncEra ETH" value={collectedMetrics.zksyncEraEther} />)}
                 </div>
 
                 <h5 className="text-base font-semibold pt-4">Actions</h5>

@@ -1,11 +1,5 @@
 import { Chain, PrivateKeyAccount } from "viem";
 
-export type IntegrationName =
-    "EigenLayer"
-    | "OrbiterBridgeZkSyncArbitrum"
-    | "ZkSyncDmsg"
-    ;
-
 export type MetricsToDisplay =
     "MainnetBalance"
     | "StEthBalance"
@@ -17,6 +11,7 @@ export type MetricsToDisplay =
 
 export type CollectedMetrics = {
     mainnetEther: bigint | undefined,
+    zksyncEraEther: bigint | undefined,
 }
 
 export type WidgetType =
@@ -37,16 +32,16 @@ export type UiContext = {
 
 export type HandlerFor<T extends WidgetType> =
     T extends "Transfer" ? (account: PrivateKeyAccount, amount: string, context: UiContext) => void
-    : T extends "SimpleAction" ? (context: UiContext) => string
+    : T extends "SimpleAction" ? (account: PrivateKeyAccount, context: UiContext) => void
     : never;
 
 export type WidgetArgs<T extends WidgetType> =
     T extends "Transfer" ? [string, string]
-    : T extends "SimpleAction" ? [string]
+    : T extends "SimpleAction" ? [string, string]
     : never;
 
 export type IntegrationInfo<T extends WidgetType> = {
-    name: IntegrationName,
+    name: string,
     metrics: MetricsToDisplay[],
     widget: WidgetType,
     widgetArgs: WidgetArgs<T>,
