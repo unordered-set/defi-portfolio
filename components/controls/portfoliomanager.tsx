@@ -48,9 +48,9 @@ export default function PortfolioManager({ wallets }: { wallets: PrivateKeyAccou
     </>);
 }
 
-function groupCustomBalances(metrics: MetricsToDisplay[]): {"native": Chain[], "erc20": [Chain, `0x${string}`, string][]} {
-    const result = {"native": ([] as Chain[]), "erc20": ([] as [Chain, `0x${string}`, string][])}
-    type NonStringMetric = {"type": "native", "chain": Chain} | {"type": "erc20", "contract": `0x${string}`, "label": "string", "chain": Chain};
+function groupCustomBalances(metrics: MetricsToDisplay[]): {"native": Chain[], "erc20": [Chain, `0x${string}`, string, number][]} {
+    const result = {"native": ([] as Chain[]), "erc20": ([] as [Chain, `0x${string}`, string, number][])}
+    type NonStringMetric = {"type": "native", "chain": Chain} | {"type": "erc20", "contract": `0x${string}`, "label": "string", "chain": Chain, "decimal": number};
     metrics.filter(m => typeof m === "object").forEach(m => {
         const metric = m as NonStringMetric;
         if (metric.type === "native") {
@@ -59,7 +59,7 @@ function groupCustomBalances(metrics: MetricsToDisplay[]): {"native": Chain[], "
             }
         } else if (metric.type === "erc20") {
             if (!result["erc20"].find(([c, a]) => c.id === metric.chain.id && a === metric.contract)) {
-                result["erc20"].push([metric.chain, metric.contract, metric.label])
+                result["erc20"].push([metric.chain, metric.contract, metric.label, metric.decimal])
             }
         }
     })

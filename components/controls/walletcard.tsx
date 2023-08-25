@@ -20,15 +20,16 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useState } from "react";
+import { Rock_3D } from "next/font/google";
 
-function BalanceMetrics({ name, value }: { name: string, value: bigint | undefined }) {
+function BalanceMetrics({ name, value, decimal }: { name: string, value: bigint | undefined, decimal: number | undefined }) {
     return (<>
         <div>{name}</div>
         <div>
             {value === undefined ? "..." :
                 <TooltipProvider>
                     <Tooltip>
-                        <TooltipTrigger>{getEtherWithPrecison(value)}</TooltipTrigger>
+                        <TooltipTrigger>{getEtherWithPrecison(value, 3, decimal)}</TooltipTrigger>
                         <TooltipContent>
                             <p>RAW: {value.toString()}</p>
                         </TooltipContent>
@@ -83,11 +84,11 @@ export default function WalletCard(
                 <h5 className="text-base font-semibold pt-4">Balances</h5>
                 <div className="grid gap-2 grid-cols-2">
                     {selectedMetrics.includes("MainnetBalance") &&
-                        (<BalanceMetrics name="Mainnet ETH" value={collectedMetrics.mainnetEther} />)}
+                        (<BalanceMetrics name="Mainnet ETH" decimal={18} value={collectedMetrics.mainnetEther} />)}
                     {selectedMetrics.includes("ZkSyncEthBalance") &&
-                        (<BalanceMetrics name="ZkSyncEra ETH" value={collectedMetrics.zksyncEraEther} />)}
-                    {collectedMetrics.erc20Balances.map(([chain, contractAddress, label, balance]) => {
-                        return (<BalanceMetrics name={`${chain.name} ${label}`} value={ balance } key={`${chain.id}-${contractAddress}`} />)
+                        (<BalanceMetrics name="ZkSyncEra ETH" decimal={18} value={collectedMetrics.zksyncEraEther} />)}
+                    {collectedMetrics.erc20Balances.map(([chain, contractAddress, label, decimal, balance]) => {
+                        return (<BalanceMetrics name={`${chain.name} ${label}`} value={ balance } decimal={ decimal } key={`${chain.id}-${contractAddress}`} />)
                     })}
                 </div>
 

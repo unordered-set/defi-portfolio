@@ -85,18 +85,18 @@ export function useZkSyncEraBalances({ enabled, wallets }: { enabled: boolean, w
     return useGenericBalanceChecker({ enabled, wallets, provider: zksyncProvider })
 }
 
-export const ZkSyncUSDC: MetricsToDisplay = { type: "erc20", chain: zkSync, contract: "0x3355df6d4c9c3035724fd0e3914de96a5a83aaf4", label: "USDC" };
+export const ZkSyncUSDC: MetricsToDisplay = { type: "erc20", chain: zkSync, contract: "0x3355df6d4c9c3035724fd0e3914de96a5a83aaf4", label: "USDC", "decimal": 6 };
 
 export function useCustomBalances({ enabled, wallets, request }: {
     enabled: boolean,
     wallets: PrivateKeyAccount[],
-    request: { "native": Chain[], "erc20": [Chain, `0x${string}`, string][] }
+    request: { "native": Chain[], "erc20": [Chain, `0x${string}`, string, number][] }
 }) : [
-    [Chain, bigint][][], [Chain, `0x${string}`, string, bigint][][]
+    [Chain, bigint][][], [Chain, `0x${string}`, string, number, bigint][][]
 ] {
 
     const [nativeBalances, setNativeBalances] = useState<[Chain, bigint][][]>(Array(wallets.length).fill([]));
-    const [erc20Balances, setErc20Balances] = useState<[Chain, `0x${string}`, string, bigint][][]>(Array(wallets.length).fill([]));
+    const [erc20Balances, setErc20Balances] = useState<[Chain, `0x${string}`, string, number, bigint][][]>(Array(wallets.length).fill([]));
 
     const requestKey = `${request["native"].map(c => c.id).join("+")}::${request["erc20"].map(([ch, co]) => `${ch.id}_${co}`).join("+")}`;
 
@@ -120,18 +120,18 @@ export function useCustomBalances({ enabled, wallets, request }: {
                     setNativeBalances(newNativeBalances)
                 })
         }
-        for (const [chain, contract, label] of request["erc20"]) {
+        for (const [chain, contract, label, decimal] of request["erc20"]) {
             const provider = providerByChain(chain)
             getMulticall3Erc20Balances(wallets, contract, provider)
                 .then(result => {
                     console.log("Got ERC20 balances for", chain.name, contract, result)
-                    const newErc20Balances = [] as [Chain, `0x${string}`, string, bigint][][];
+                    const newErc20Balances = [] as [Chain, `0x${string}`, string, number, bigint][][];
                     result.forEach((rec, index) => {
                         if (rec.status === "success") {
-                            newErc20Balances.push([...erc20Balances[index], [chain, contract, label, rec.result]]);
+                            newErc20Balances.push([...erc20Balances[index], [chain, contract, label, decimal, rec.result]]);
                         } else {
                             console.log(`Error on fetching status for ${wallets[index].address}: ${rec.error}`);
-                            newErc20Balances.push([...erc20Balances[index], [chain, contract, label, 0n]]);
+                            newErc20Balances.push([...erc20Balances[index], [chain, contract, label, decimal, 0n]]);
                         }
                     });
                     setErc20Balances(newErc20Balances)

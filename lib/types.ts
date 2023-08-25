@@ -8,14 +8,14 @@ export type MetricsToDisplay =
     | "BaseDevNftBalance"
     | "EigenLayerStakedStEth"
     | {"type": "native", "chain": Chain}
-    | {"type": "erc20", "contract": `0x${string}`, "chain": Chain, "label": string}
+    | {"type": "erc20", "contract": `0x${string}`, "chain": Chain, "label": string, "decimal": number}
     ;
 
 export type CollectedMetrics = {
     mainnetEther: bigint | undefined,
     zksyncEraEther: bigint | undefined,
     nativeBalances: [Chain, bigint][],
-    erc20Balances: [Chain, `0x${string}`, string, bigint][],
+    erc20Balances: [Chain, `0x${string}`, string, number, bigint][],
 }
 
 export type WidgetType =
