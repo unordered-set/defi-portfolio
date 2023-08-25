@@ -85,6 +85,7 @@ export function useZkSyncEraBalances({ enabled, wallets }: { enabled: boolean, w
     return useGenericBalanceChecker({ enabled, wallets, provider: zksyncProvider })
 }
 
+// Yes, I know about decimals, but doing 2x requests for the field which is never going to be updated is a meh...
 export const ZkSyncUSDC: MetricsToDisplay = { type: "erc20", chain: zkSync, contract: "0x3355df6d4c9c3035724fd0e3914de96a5a83aaf4", label: "USDC", "decimal": 6 };
 
 export function useCustomBalances({ enabled, wallets, request }: {
