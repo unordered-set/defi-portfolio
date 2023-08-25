@@ -3,7 +3,7 @@ import { IntegrationInfo, UiContext } from "../types"
 import { PrivateKeyAccount, parseAbi, createWalletClient, http } from "viem"
 
 const LibertasOmnibusZkSyncEra: IntegrationInfo<"SimpleAction"> = {
-    name: "EigenLayer",
+    name: "Libertas Omnibus",
     metrics: ["ZkSyncEthBalance"],
     widget: "SimpleAction",
     widgetArgs: ["Libertas Omnibus", "ZkSync Era"],

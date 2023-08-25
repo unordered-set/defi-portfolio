@@ -7,11 +7,15 @@ export type MetricsToDisplay =
     | "BaseEthBalance"
     | "BaseDevNftBalance"
     | "EigenLayerStakedStEth"
+    | {"type": "native", "chain": Chain}
+    | {"type": "erc20", "contract": `0x${string}`, "chain": Chain, "label": string}
     ;
 
 export type CollectedMetrics = {
     mainnetEther: bigint | undefined,
     zksyncEraEther: bigint | undefined,
+    nativeBalances: [Chain, bigint][],
+    erc20Balances: [Chain, `0x${string}`, string, bigint][],
 }
 
 export type WidgetType =

@@ -86,6 +86,9 @@ export default function WalletCard(
                         (<BalanceMetrics name="Mainnet ETH" value={collectedMetrics.mainnetEther} />)}
                     {selectedMetrics.includes("ZkSyncEthBalance") &&
                         (<BalanceMetrics name="ZkSyncEra ETH" value={collectedMetrics.zksyncEraEther} />)}
+                    {collectedMetrics.erc20Balances.map(([chain, contractAddress, label, balance]) => {
+                        return (<BalanceMetrics name={`${chain.name} ${label}`} value={ balance } key={`${chain.id}-${contractAddress}`} />)
+                    })}
                 </div>
 
                 <h5 className="text-base font-semibold pt-4">Actions</h5>
