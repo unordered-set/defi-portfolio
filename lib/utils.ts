@@ -12,8 +12,8 @@ export function getEtherWithPrecison(eth: bigint, precision: number = 3) {
   return formattedEther.substring(0, dotPos + 1 + precision);
 }
 
-export function getTimestampOffset(seconds: number) {
+export function getTimestampOffset(seconds: number): bigint {
   const d = new Date();
   d.setSeconds(d.getSeconds() + seconds);
-  return Math.ceil(d.valueOf() / 1000);
+  return BigInt(Math.ceil(d.valueOf() / 1000));
 }

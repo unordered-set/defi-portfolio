@@ -41,8 +41,8 @@ async function muteIoZkSyncEthToUSDC(account: PrivateKeyAccount, amount: string,
         transport: http(zksyncProvider.transport.url)
     })
 
-    const amountOutMin = 0;  // TODO: estimate using some exchanges APIs in order
-                             //       not to make things inefficient.
+    const amountOutMin = 0n;  // TODO: estimate using some exchanges APIs in order
+                              //       not to make things inefficient.
     const { request } = await zksyncProvider.simulateContract({
         account,
         address,
@@ -57,8 +57,8 @@ async function muteIoZkSyncEthToUSDC(account: PrivateKeyAccount, amount: string,
             account.address,
             getTimestampOffset(120),
             [
-                1,
-                0,
+                true,
+                false,
             ]
         ],
 
